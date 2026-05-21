@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card">
+  <div class="form-actions">
+    <h2>Members</h2>
+    <a href="{{ url_for('add_member') }}"><button>Add New Member</button></a>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Phone</th>
+        <th>Membership</th>
+        <th>Trainer</th>
+        <th>Joined</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for member in members %}
+      <tr>
+        <td>{{ member.name }}</td>
+        <td>{{ member.email }}</td>
+        <td>{{ member.phone }}</td>
+        <td>{{ member.membership_type }}</td>
+        <td>{{ member.trainer_name or '-' }}</td>
+        <td>{{ member.join_date }}</td>
+        <td>
+          <a href="{{ url_for('edit_member', id=member.id) }}"><button>Edit</button></a>
+          <form action="{{ url_for('delete_member', id=member.id) }}" method="post" style="display:inline;">
+            <button type="submit" class="delete-button">Delete</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

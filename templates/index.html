@@ -1,0 +1,164 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card hero-card">
+  <div class="hero-copy">
+    <span class="eyebrow">GymPro Dashboard</span>
+    <h2>Run a smarter gym with beautiful control and total visibility.</h2>
+    <p>Manage members, trainers, classes, and payments faster with an elegant dashboard designed for fitness admins.</p>
+    <div class="hero-actions">
+      <a class="button primary" href="{{ url_for('members') }}">View Members</a>
+      <a class="button secondary" href="{{ url_for('classes') }}">See Classes</a>
+    </div>
+  </div>
+  <div class="hero-metrics">
+    <div class="metric-card">
+      <strong>{{ member_count }}</strong>
+      <span>Members registered</span>
+    </div>
+    <div class="metric-card">
+      <strong>{{ trainer_count }}</strong>
+      <span>Trainers available</span>
+    </div>
+    <div class="metric-card">
+      <strong>{{ class_count }}</strong>
+      <span>Classes scheduled</span>
+    </div>
+    <div class="metric-card">
+      <strong>{{ payment_count }}</strong>
+      <span>Payments recorded</span>
+    </div>
+  </div>
+</div>
+<div class="card offer-showcase">
+  <div class="offers-header">
+    <div>
+      <span class="eyebrow">Limited-Time Deals</span>
+      <h3>Stand out with premium gym plans and trainer-led perks.</h3>
+    </div>
+    <a class="button secondary" href="{{ url_for('offers') }}">Explore all offers</a>
+  </div>
+  <div class="offer-grid">
+    <article class="offer-card offer-card-1">
+      <span class="offer-pill">Best Seller</span>
+      <h4>Trainer Starter Pack</h4>
+      <p>Save 15% on your first 3 training sessions with a certified coach.</p>
+      <strong>Code: COACH15</strong>
+    </article>
+    <article class="offer-card offer-card-2">
+      <span class="offer-pill">Flash Deal</span>
+      <h4>Unlimited Gym Access</h4>
+      <p>Get 2 months free on annual membership when you sign up today.</p>
+      <strong>Code: GYMGO</strong>
+    </article>
+    <article class="offer-card offer-card-3">
+      <span class="offer-pill">Energy Boost</span>
+      <h4>Nutrition & Training Bundle</h4>
+      <p>Complimentary meal plan with any premium membership.</p>
+      <strong>Code: FUELUP</strong>
+    </article>
+    <article class="offer-card offer-card-4">
+      <span class="offer-pill">Team Special</span>
+      <h4>Bring a Friend</h4>
+      <p>Both members get 10% off and a free fitness assessment.</p>
+      <strong>Code: DUOPOWER</strong>
+    </article>
+  </div>
+</div>
+<div class="card video-showcase">
+  <div class="video-header">
+    <span class="eyebrow">Live Gym Scenes</span>
+    <h3>Real gym energy in every training moment.</h3>
+  </div>
+  <div class="video-grid">
+    <article class="video-tile cardio">
+      <video autoplay muted loop playsinline>
+        <source src="{{ url_for('static', filename='videos/gym_cardio.mp4') }}" type="video/mp4" />
+        <source src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" type="video/mp4" />
+      </video>
+      <div class="video-caption">
+        <strong>Cardio Zone</strong>
+        <span>High-energy cardio sessions and interval training.</span>
+      </div>
+    </article>
+
+    <article class="video-tile weights">
+      <video autoplay muted loop playsinline>
+        <source src="{{ url_for('static', filename='videos/gym_weights.mp4') }}" type="video/mp4" />
+        <source src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" type="video/mp4" />
+      </video>
+      <div class="video-caption">
+        <strong>Strength Floor</strong>
+        <span>Free weights, power lifts, and strength circuits.</span>
+      </div>
+    </article>
+
+    <article class="video-tile yoga">
+      <video autoplay muted loop playsinline>
+        <source src="{{ url_for('static', filename='videos/gym_yoga.mp4') }}" type="video/mp4" />
+        <source src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" type="video/mp4" />
+      </video>
+      <div class="video-caption">
+        <strong>Recovery & Mobility</strong>
+        <span>Yoga flows, stretching, and guided recovery.</span>
+      </div>
+    </article>
+
+    <article class="video-tile studio">
+      <video autoplay muted loop playsinline>
+        <source src="{{ url_for('static', filename='videos/gym_studio.mp4') }}" type="video/mp4" />
+        <source src="https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4" type="video/mp4" />
+      </video>
+      <div class="video-caption">
+        <strong>Studio Class</strong>
+        <span>Instructor-led studio sessions and group energy.</span>
+      </div>
+    </article>
+  </div>
+</div>
+<div class="popup-offer" id="popupOffer">
+  <strong>Flash Offer</strong>
+  <p id="popupOfferText">Sign up now and get a free trainer session.</p>
+</div>
+<div class="card quote-card">
+  <div class="quote-slider">
+    <div class="quote quote-1">
+      <p>“The pain you feel today will be the strength you feel tomorrow.”</p>
+      <span>— Gym Wisdom</span>
+    </div>
+    <div class="quote quote-2">
+      <p>“Success starts with self-discipline and a little extra sweat.”</p>
+      <span>— Fitness Coach</span>
+    </div>
+    <div class="quote quote-3">
+      <p>“Every workout is progress; every rep is a step toward your goal.”</p>
+      <span>— Training Mantra</span>
+    </div>
+    <div class="quote quote-4">
+      <p>“Strong body. Strong mind. Strong team. Strong gym.”</p>
+      <span>— Gym Spirit</span>
+    </div>
+  </div>
+</div>
+<div class="card stats-grid home-features">
+  <div class="stat-card feature-card">
+    <span class="stat-title">Members</span>
+    <strong>Complete profile control</strong>
+    <p>Track memberships, update contact info, and view attendance.</p>
+  </div>
+  <div class="stat-card feature-card">
+    <span class="stat-title">Trainers</span>
+    <strong>Powerful instructor tools</strong>
+    <p>Keep trainer schedules and skills streamlined for growth.</p>
+  </div>
+  <div class="stat-card feature-card">
+    <span class="stat-title">Classes</span>
+    <strong>Smart schedule planning</strong>
+    <p>Organize workouts, manage times, and keep your class list fresh.</p>
+  </div>
+  <div class="stat-card feature-card">
+    <span class="stat-title">Payments</span>
+    <strong>Fast billing flow</strong>
+    <p>Record payments quickly and keep a clean payment history.</p>
+  </div>
+</div>
+{% endblock %}

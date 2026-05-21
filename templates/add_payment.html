@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card">
+  <h2>Record Payment</h2>
+  <form method="post">
+    <label>Member Name</label>
+    <input type="text" name="member_name" required />
+    <label>Amount</label>
+    <input type="number" name="amount" step="0.01" required />
+    <label>Payment Date</label>
+    <input type="date" name="payment_date" required />
+    <label>Notes</label>
+    <input type="text" name="notes" />
+    <div class="form-actions">
+      <input type="submit" value="Save Payment" />
+      <a href="{{ url_for('payments') }}"><button type="button">Cancel</button></a>
+    </div>
+  </form>
+</div>
+{% endblock %}

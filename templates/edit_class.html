@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card">
+  <h2>Edit Class</h2>
+  <form method="post">
+    <label>Class Name</label>
+    <input type="text" name="class_name" value="{{ gym_class.class_name }}" required />
+    <label>Schedule</label>
+    <input type="text" name="schedule" value="{{ gym_class.schedule }}" required />
+    <label>Trainer</label>
+    <input type="text" name="trainer" value="{{ gym_class.trainer }}" required />
+    <div class="form-actions">
+      <input type="submit" value="Update Class" />
+      <a href="{{ url_for('classes') }}"><button type="button">Cancel</button></a>
+    </div>
+  </form>
+</div>
+{% endblock %}

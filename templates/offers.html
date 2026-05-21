@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card offer-hero">
+  <div>
+    <span class="eyebrow">From the gym owner</span>
+    <h2>Welcome to our membership plans.</h2>
+    <p>We believe every member deserves a plan built for their goals. Choose a package designed for consistency, growth, or elite performance.</p>
+  </div>
+</div>
+<div class="card pricing-grid">
+  <div class="plan-card popular">
+    <span class="plan-type">Starter</span>
+    <strong>$29/month</strong>
+    <p>Ideal for customers who want open gym access and a simple membership plan.</p>
+    <ul>
+      <li>Unlimited gym access</li>
+      <li>1 personal training session</li>
+      <li>Access to standard classes</li>
+      <li>Locker room access</li>
+    </ul>
+    <a class="button primary" href="{{ url_for('add_member', membership_type='Monthly') }}">Choose Starter</a>
+  </div>
+  <div class="plan-card">
+    <span class="plan-type">Growth</span>
+    <strong>$49/month</strong>
+    <p>Perfect for members who want coaching support and more class options.</p>
+    <ul>
+      <li>Unlimited gym access</li>
+      <li>3 coaching sessions/month</li>
+      <li>All group classes</li>
+      <li>Nutrition guidance</li>
+    </ul>
+    <a class="button primary" href="{{ url_for('add_member', membership_type='Quarterly') }}">Choose Growth</a>
+  </div>
+  <div class="plan-card">
+    <span class="plan-type">Elite</span>
+    <strong>$99/month</strong>
+    <p>For serious customers who want premium coaching, workshops, and VIP support.</p>
+    <ul>
+      <li>Unlimited gym access</li>
+      <li>Weekly training sessions</li>
+      <li>Premium classes & workshops</li>
+      <li>Priority member support</li>
+    </ul>
+    <a class="button primary" href="{{ url_for('add_member', membership_type='Yearly') }}">Choose Elite</a>
+  </div>
+</div>
+<div class="card offer-highlights">
+  <h3>Current offers</h3>
+  <ul>
+    <li><strong>Summer deal:</strong> 20% off annual plans for new signups.</li>
+    <li><strong>Referral bonus:</strong> Bring a friend and get your next month free.</li>
+    <li><strong>Family pack:</strong> 10% discount when 3 or more members join together.</li>
+  </ul>
+</div>
+{% endblock %}

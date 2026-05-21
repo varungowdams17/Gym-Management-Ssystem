@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card">
+  <h2>Login</h2>
+  <form method="post">
+    <label>Email or Phone</label>
+    <input type="text" name="email_or_phone" placeholder="you@example.com or 555-1234" required />
+    <label>Password</label>
+    <input type="password" name="password" required />
+    <div class="form-actions">
+      <input type="submit" value="Sign In" />
+      <a href="{{ url_for('index') }}"><button type="button">Cancel</button></a>
+    </div>
+  </form>
+  <p style="margin-top:12px;color:rgba(255,255,255,0.8)">No account? Ask an admin to add you, or use registration if enabled.</p>
+</div>
+{% endblock %}
