@@ -13,9 +13,10 @@ SCHEMA_FILE = os.path.join(os.path.dirname(__file__), "schema.sql")
 # ── DB helpers ────────────────────────────────────────────────────────────────
 
 def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
+    conn = sqlite3.connect(DATABASE, timeout=10, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute("PRAGMA journal_mode = WAL")
     return conn
 
 
@@ -87,23 +88,20 @@ def register():
 
         conn = get_db_connection()
         try:
-            conn.execute(
+            cursor = conn.execute(
                 "INSERT INTO users (email, phone, password_hash) VALUES (?, ?, ?)",
                 (email or None, phone or None, generate_password_hash(password)),
             )
             conn.commit()
+            user_id = cursor.lastrowid
         except sqlite3.IntegrityError:
             flash("An account with that email or phone already exists.")
             conn.close()
             return redirect(url_for("register"))
 
-        user = conn.execute(
-            "SELECT * FROM users WHERE email = ? OR phone = ?",
-            (email or None, phone or None),
-        ).fetchone()
         session.clear()
-        session["user_id"] = user["id"]
-        session["user_name"] = user["email"] or user["phone"]
+        session["user_id"] = user_id
+        session["user_name"] = email or phone
         conn.close()
         flash("Account created. Welcome!")
         return redirect(url_for("index"))
