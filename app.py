@@ -20,24 +20,31 @@ def get_db_connection():
 
 
 def init_db():
-    """Create tables from schema if the DB doesn't exist yet."""
-    if not os.path.exists(DATABASE):
+    """Create tables from schema. Always runs schema if any core table is missing."""
+    conn = get_db_connection()
+    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    conn.close()
+
+    # If any core table is missing, run the full schema (safe — schema drops before creating)
+    if not tables.issuperset({"users", "members", "trainers", "classes", "payments"}):
         conn = get_db_connection()
         with open(SCHEMA_FILE, "r", encoding="utf-8") as f:
             conn.executescript(f.read())
         conn.commit()
         conn.close()
-    else:
-        # Migration: add user_id to existing tables if missing
-        conn = get_db_connection()
-        for table in ("members", "trainers", "classes", "payments"):
-            cols = [c[1] for c in conn.execute(f"PRAGMA table_info({table})").fetchall()]
-            if "user_id" not in cols:
-                conn.execute(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0")
-        if "trainer_id" not in [c[1] for c in conn.execute("PRAGMA table_info(members)").fetchall()]:
-            conn.execute("ALTER TABLE members ADD COLUMN trainer_id INTEGER")
-        conn.commit()
-        conn.close()
+        return
+
+    # Migration for existing DBs: add user_id if missing
+    conn = get_db_connection()
+    for table in ("members", "trainers", "classes", "payments"):
+        cols = [c[1] for c in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+        if "user_id" not in cols:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0")
+    cols = [c[1] for c in conn.execute("PRAGMA table_info(members)").fetchall()]
+    if "trainer_id" not in cols:
+        conn.execute("ALTER TABLE members ADD COLUMN trainer_id INTEGER")
+    conn.commit()
+    conn.close()
 
 
 init_db()

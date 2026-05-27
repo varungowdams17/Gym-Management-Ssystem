@@ -1,17 +1,17 @@
+DROP TABLE IF EXISTS payments;
+DROP TABLE IF EXISTS classes;
 DROP TABLE IF EXISTS members;
-CREATE TABLE members (
+DROP TABLE IF EXISTS trainers;
+DROP TABLE IF EXISTS users;
+
+CREATE TABLE users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    membership_type TEXT NOT NULL,
-    trainer_id INTEGER,
-    join_date TEXT NOT NULL DEFAULT (date('now')),
-    FOREIGN KEY (user_id) REFERENCES users(id)
+    email TEXT UNIQUE,
+    phone TEXT UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (date('now'))
 );
 
-DROP TABLE IF EXISTS trainers;
 CREATE TABLE trainers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -22,16 +22,19 @@ CREATE TABLE trainers (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
-DROP TABLE IF EXISTS users;
-CREATE TABLE users (
+CREATE TABLE members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE,
-    phone TEXT UNIQUE,
-    password_hash TEXT NOT NULL,
-    created_at TEXT NOT NULL DEFAULT (date('now'))
+    user_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    membership_type TEXT NOT NULL,
+    trainer_id INTEGER,
+    join_date TEXT NOT NULL DEFAULT (date('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (trainer_id) REFERENCES trainers(id)
 );
 
-DROP TABLE IF EXISTS classes;
 CREATE TABLE classes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -42,7 +45,6 @@ CREATE TABLE classes (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
-DROP TABLE IF EXISTS payments;
 CREATE TABLE payments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
