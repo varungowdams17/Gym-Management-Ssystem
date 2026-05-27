@@ -8,8 +8,8 @@ __pycache__/
 *.py[cod]
 *.pyo
 
-# SQLite database (optional — remove this line if you want to track the DB)
-# gym.db
+# SQLite database
+gym.db
 
 # Environment variables
 .env
