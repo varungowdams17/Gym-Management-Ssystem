@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="card" style="max-width:480px;margin:0 auto;">
+  <h2>Create Account</h2>
+  <form method="post">
+    <label>Email</label>
+    <input type="email" name="email" placeholder="you@example.com" />
+    <label>Phone</label>
+    <input type="text" name="phone" placeholder="9999999999" />
+    <p style="font-size:0.85rem;color:rgba(255,255,255,0.6);margin:-10px 0 12px;">Provide at least one — email or phone.</p>
+    <label>Password</label>
+    <input type="password" name="password" required placeholder="Choose a strong password" />
+    <label>Confirm Password</label>
+    <input type="password" name="confirm_password" required placeholder="Repeat your password" />
+    <div class="form-actions">
+      <input type="submit" value="Register" />
+      <a href="{{ url_for('login') }}"><button type="button">Already have an account?</button></a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,21 +1,26 @@
 import os
 import sqlite3
+from functools import wraps
 from flask import Flask, render_template, request, redirect, url_for, flash, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__)
-app.secret_key = "gym-management-secret"
+app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-production")
 DATABASE = os.path.join(os.path.dirname(__file__), "gym.db")
 SCHEMA_FILE = os.path.join(os.path.dirname(__file__), "schema.sql")
 
 
+# ── DB helpers ────────────────────────────────────────────────────────────────
+
 def get_db_connection():
     conn = sqlite3.connect(DATABASE)
     conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON")
     return conn
 
 
 def init_db():
+    """Create tables from schema if the DB doesn't exist yet."""
     if not os.path.exists(DATABASE):
         conn = get_db_connection()
         with open(SCHEMA_FILE, "r", encoding="utf-8") as f:
@@ -23,40 +28,129 @@ def init_db():
         conn.commit()
         conn.close()
     else:
+        # Migration: add user_id to existing tables if missing
         conn = get_db_connection()
-        columns = conn.execute("PRAGMA table_info(members)").fetchall()
-        if not any(col[1] == "trainer_id" for col in columns):
+        for table in ("members", "trainers", "classes", "payments"):
+            cols = [c[1] for c in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+            if "user_id" not in cols:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN user_id INTEGER NOT NULL DEFAULT 0")
+        if "trainer_id" not in [c[1] for c in conn.execute("PRAGMA table_info(members)").fetchall()]:
             conn.execute("ALTER TABLE members ADD COLUMN trainer_id INTEGER")
-            conn.commit()
-        # Ensure users table exists for authentication (migration for older DBs)
-        user_table = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'").fetchone()
-        if not user_table:
-            conn.execute(
-                """
-                CREATE TABLE users (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    email TEXT UNIQUE,
-                    phone TEXT UNIQUE,
-                    password_hash TEXT NOT NULL,
-                    created_at TEXT NOT NULL DEFAULT (date('now'))
-                )
-                """
-            )
-            conn.commit()
+        conn.commit()
         conn.close()
 
 
-# Initialize the database when the app module loads.
 init_db()
 
 
+# ── Auth decorator ────────────────────────────────────────────────────────────
+
+def login_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("user_id"):
+            flash("Please log in to continue.")
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+# ── Auth routes ───────────────────────────────────────────────────────────────
+
+@app.route("/register", methods=("GET", "POST"))
+def register():
+    if session.get("user_id"):
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        email = request.form.get("email", "").strip()
+        phone = request.form.get("phone", "").strip()
+        password = request.form.get("password", "")
+        confirm = request.form.get("confirm_password", "")
+
+        if not password or not confirm:
+            flash("Password is required.")
+            return redirect(url_for("register"))
+        if password != confirm:
+            flash("Passwords do not match.")
+            return redirect(url_for("register"))
+        if not email and not phone:
+            flash("Provide at least an email or phone number.")
+            return redirect(url_for("register"))
+
+        conn = get_db_connection()
+        try:
+            conn.execute(
+                "INSERT INTO users (email, phone, password_hash) VALUES (?, ?, ?)",
+                (email or None, phone or None, generate_password_hash(password)),
+            )
+            conn.commit()
+        except sqlite3.IntegrityError:
+            flash("An account with that email or phone already exists.")
+            conn.close()
+            return redirect(url_for("register"))
+
+        user = conn.execute(
+            "SELECT * FROM users WHERE email = ? OR phone = ?",
+            (email or None, phone or None),
+        ).fetchone()
+        session.clear()
+        session["user_id"] = user["id"]
+        session["user_name"] = user["email"] or user["phone"]
+        conn.close()
+        flash("Account created. Welcome!")
+        return redirect(url_for("index"))
+
+    return render_template("register.html")
+
+
+@app.route("/login", methods=("GET", "POST"))
+def login():
+    if session.get("user_id"):
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        email_or_phone = request.form.get("email_or_phone", "").strip()
+        password = request.form.get("password", "")
+        conn = get_db_connection()
+        if "@" in email_or_phone:
+            user = conn.execute("SELECT * FROM users WHERE email = ?", (email_or_phone,)).fetchone()
+        else:
+            user = conn.execute("SELECT * FROM users WHERE phone = ?", (email_or_phone,)).fetchone()
+
+        if not user or not check_password_hash(user["password_hash"], password):
+            flash("Invalid credentials.")
+            conn.close()
+            return redirect(url_for("login"))
+
+        session.clear()
+        session["user_id"] = user["id"]
+        session["user_name"] = user["email"] or user["phone"]
+        conn.close()
+        flash("Logged in successfully.")
+        return redirect(url_for("index"))
+
+    return render_template("login.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    flash("Logged out.")
+    return redirect(url_for("login"))
+
+
+# ── Dashboard ─────────────────────────────────────────────────────────────────
+
 @app.route("/")
+@login_required
 def index():
+    uid = session["user_id"]
     conn = get_db_connection()
-    member_count = conn.execute("SELECT COUNT(*) FROM members").fetchone()[0]
-    trainer_count = conn.execute("SELECT COUNT(*) FROM trainers").fetchone()[0]
-    class_count = conn.execute("SELECT COUNT(*) FROM classes").fetchone()[0]
-    payment_count = conn.execute("SELECT COUNT(*) FROM payments").fetchone()[0]
+    member_count  = conn.execute("SELECT COUNT(*) FROM members  WHERE user_id = ?", (uid,)).fetchone()[0]
+    trainer_count = conn.execute("SELECT COUNT(*) FROM trainers WHERE user_id = ?", (uid,)).fetchone()[0]
+    class_count   = conn.execute("SELECT COUNT(*) FROM classes  WHERE user_id = ?", (uid,)).fetchone()[0]
+    payment_count = conn.execute("SELECT COUNT(*) FROM payments WHERE user_id = ?", (uid,)).fetchone()[0]
     conn.close()
     return render_template(
         "index.html",
@@ -68,62 +162,39 @@ def index():
 
 
 @app.route("/offers")
+@login_required
 def offers():
     return render_template("offers.html")
 
 
-@app.route('/login', methods=("GET", "POST"))
-def login():
-    if request.method == 'POST':
-        email_or_phone = request.form.get('email_or_phone', '').strip()
-        password = request.form.get('password', '')
-        conn = get_db_connection()
-        user = None
-        if '@' in email_or_phone:
-            user = conn.execute('SELECT * FROM users WHERE email = ?', (email_or_phone,)).fetchone()
-        else:
-            user = conn.execute('SELECT * FROM users WHERE phone = ?', (email_or_phone,)).fetchone()
-
-        if not user or not check_password_hash(user['password_hash'], password):
-            flash('Invalid credentials.')
-            conn.close()
-            return redirect(url_for('login'))
-
-        session.clear()
-        session['user_id'] = user['id']
-        session['user_name'] = user['email'] or user['phone']
-        conn.close()
-        flash('Logged in successfully.')
-        return redirect(url_for('index'))
-
-    return render_template('login.html')
-
-
-@app.route('/logout')
-def logout():
-    session.clear()
-    flash('Logged out.')
-    return redirect(url_for('index'))
-
+# ── Members ───────────────────────────────────────────────────────────────────
 
 @app.route("/members")
+@login_required
 def members():
+    uid = session["user_id"]
     conn = get_db_connection()
-    members = conn.execute(
+    rows = conn.execute(
         "SELECT members.*, trainers.name AS trainer_name "
         "FROM members "
-        "LEFT JOIN trainers ON members.trainer_id = trainers.id "
-        "ORDER BY members.id DESC"
+        "LEFT JOIN trainers ON members.trainer_id = trainers.id AND trainers.user_id = ? "
+        "WHERE members.user_id = ? "
+        "ORDER BY members.id DESC",
+        (uid, uid),
     ).fetchall()
     conn.close()
-    return render_template("members.html", members=members)
+    return render_template("members.html", members=rows)
 
 
 @app.route("/members/add", methods=("GET", "POST"))
+@login_required
 def add_member():
+    uid = session["user_id"]
     membership_type = request.args.get("membership_type", "Monthly")
     conn = get_db_connection()
-    trainers = conn.execute("SELECT id, name FROM trainers ORDER BY name").fetchall()
+    trainers = conn.execute(
+        "SELECT id, name FROM trainers WHERE user_id = ? ORDER BY name", (uid,)
+    ).fetchall()
 
     if request.method == "POST":
         name = request.form["name"].strip()
@@ -139,8 +210,8 @@ def add_member():
             return redirect(url_for("add_member", membership_type=membership_type))
 
         conn.execute(
-            "INSERT INTO members (name, email, phone, membership_type, trainer_id) VALUES (?, ?, ?, ?, ?)",
-            (name, email, phone, membership_type, trainer_id),
+            "INSERT INTO members (user_id, name, email, phone, membership_type, trainer_id) VALUES (?, ?, ?, ?, ?, ?)",
+            (uid, name, email, phone, membership_type, trainer_id),
         )
         conn.commit()
         conn.close()
@@ -148,23 +219,23 @@ def add_member():
         return redirect(url_for("members"))
 
     conn.close()
-    return render_template(
-        "add_member.html",
-        membership_type=membership_type,
-        trainers=trainers,
-    )
+    return render_template("add_member.html", membership_type=membership_type, trainers=trainers)
 
 
 @app.route("/members/edit/<int:id>", methods=("GET", "POST"))
+@login_required
 def edit_member(id):
+    uid = session["user_id"]
     conn = get_db_connection()
-    member = conn.execute("SELECT * FROM members WHERE id = ?", (id,)).fetchone()
+    member = conn.execute("SELECT * FROM members WHERE id = ? AND user_id = ?", (id, uid)).fetchone()
     if not member:
         conn.close()
         flash("Member not found.")
         return redirect(url_for("members"))
 
-    trainers = conn.execute("SELECT id, name FROM trainers ORDER BY name").fetchall()
+    trainers = conn.execute(
+        "SELECT id, name FROM trainers WHERE user_id = ? ORDER BY name", (uid,)
+    ).fetchall()
 
     if request.method == "POST":
         name = request.form["name"].strip()
@@ -180,8 +251,8 @@ def edit_member(id):
             return redirect(url_for("edit_member", id=id))
 
         conn.execute(
-            "UPDATE members SET name = ?, email = ?, phone = ?, membership_type = ?, trainer_id = ? WHERE id = ?",
-            (name, email, phone, membership_type, trainer_id, id),
+            "UPDATE members SET name=?, email=?, phone=?, membership_type=?, trainer_id=? WHERE id=? AND user_id=?",
+            (name, email, phone, membership_type, trainer_id, id, uid),
         )
         conn.commit()
         conn.close()
@@ -193,25 +264,35 @@ def edit_member(id):
 
 
 @app.route("/members/delete/<int:id>", methods=("POST",))
+@login_required
 def delete_member(id):
+    uid = session["user_id"]
     conn = get_db_connection()
-    conn.execute("DELETE FROM members WHERE id = ?", (id,))
+    conn.execute("DELETE FROM members WHERE id = ? AND user_id = ?", (id, uid))
     conn.commit()
     conn.close()
     flash("Member deleted.")
     return redirect(url_for("members"))
 
 
+# ── Trainers ──────────────────────────────────────────────────────────────────
+
 @app.route("/trainers")
+@login_required
 def trainers():
+    uid = session["user_id"]
     conn = get_db_connection()
-    trainers = conn.execute("SELECT * FROM trainers ORDER BY id DESC").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM trainers WHERE user_id = ? ORDER BY id DESC", (uid,)
+    ).fetchall()
     conn.close()
-    return render_template("trainers.html", trainers=trainers)
+    return render_template("trainers.html", trainers=rows)
 
 
 @app.route("/trainers/add", methods=("GET", "POST"))
+@login_required
 def add_trainer():
+    uid = session["user_id"]
     if request.method == "POST":
         name = request.form["name"].strip()
         specialty = request.form["specialty"].strip()
@@ -223,8 +304,8 @@ def add_trainer():
 
         conn = get_db_connection()
         conn.execute(
-            "INSERT INTO trainers (name, specialty, phone) VALUES (?, ?, ?)",
-            (name, specialty, phone),
+            "INSERT INTO trainers (user_id, name, specialty, phone) VALUES (?, ?, ?, ?)",
+            (uid, name, specialty, phone),
         )
         conn.commit()
         conn.close()
@@ -235,9 +316,13 @@ def add_trainer():
 
 
 @app.route("/trainers/edit/<int:id>", methods=("GET", "POST"))
+@login_required
 def edit_trainer(id):
+    uid = session["user_id"]
     conn = get_db_connection()
-    trainer = conn.execute("SELECT * FROM trainers WHERE id = ?", (id,)).fetchone()
+    trainer = conn.execute(
+        "SELECT * FROM trainers WHERE id = ? AND user_id = ?", (id, uid)
+    ).fetchone()
     if not trainer:
         conn.close()
         flash("Trainer not found.")
@@ -253,8 +338,8 @@ def edit_trainer(id):
             return redirect(url_for("edit_trainer", id=id))
 
         conn.execute(
-            "UPDATE trainers SET name = ?, specialty = ?, phone = ? WHERE id = ?",
-            (name, specialty, phone, id),
+            "UPDATE trainers SET name=?, specialty=?, phone=? WHERE id=? AND user_id=?",
+            (name, specialty, phone, id, uid),
         )
         conn.commit()
         conn.close()
@@ -266,25 +351,35 @@ def edit_trainer(id):
 
 
 @app.route("/trainers/delete/<int:id>", methods=("POST",))
+@login_required
 def delete_trainer(id):
+    uid = session["user_id"]
     conn = get_db_connection()
-    conn.execute("DELETE FROM trainers WHERE id = ?", (id,))
+    conn.execute("DELETE FROM trainers WHERE id = ? AND user_id = ?", (id, uid))
     conn.commit()
     conn.close()
     flash("Trainer deleted.")
     return redirect(url_for("trainers"))
 
 
+# ── Classes ───────────────────────────────────────────────────────────────────
+
 @app.route("/classes")
+@login_required
 def classes():
+    uid = session["user_id"]
     conn = get_db_connection()
-    classes = conn.execute("SELECT * FROM classes ORDER BY id DESC").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM classes WHERE user_id = ? ORDER BY id DESC", (uid,)
+    ).fetchall()
     conn.close()
-    return render_template("classes.html", classes=classes)
+    return render_template("classes.html", classes=rows)
 
 
 @app.route("/classes/add", methods=("GET", "POST"))
+@login_required
 def add_class():
+    uid = session["user_id"]
     if request.method == "POST":
         class_name = request.form["class_name"].strip()
         schedule = request.form["schedule"].strip()
@@ -296,8 +391,8 @@ def add_class():
 
         conn = get_db_connection()
         conn.execute(
-            "INSERT INTO classes (class_name, schedule, trainer) VALUES (?, ?, ?)",
-            (class_name, schedule, trainer),
+            "INSERT INTO classes (user_id, class_name, schedule, trainer) VALUES (?, ?, ?, ?)",
+            (uid, class_name, schedule, trainer),
         )
         conn.commit()
         conn.close()
@@ -308,9 +403,13 @@ def add_class():
 
 
 @app.route("/classes/edit/<int:id>", methods=("GET", "POST"))
+@login_required
 def edit_class(id):
+    uid = session["user_id"]
     conn = get_db_connection()
-    gym_class = conn.execute("SELECT * FROM classes WHERE id = ?", (id,)).fetchone()
+    gym_class = conn.execute(
+        "SELECT * FROM classes WHERE id = ? AND user_id = ?", (id, uid)
+    ).fetchone()
     if not gym_class:
         conn.close()
         flash("Class not found.")
@@ -326,8 +425,8 @@ def edit_class(id):
             return redirect(url_for("edit_class", id=id))
 
         conn.execute(
-            "UPDATE classes SET class_name = ?, schedule = ?, trainer = ? WHERE id = ?",
-            (class_name, schedule, trainer, id),
+            "UPDATE classes SET class_name=?, schedule=?, trainer=? WHERE id=? AND user_id=?",
+            (class_name, schedule, trainer, id, uid),
         )
         conn.commit()
         conn.close()
@@ -339,25 +438,35 @@ def edit_class(id):
 
 
 @app.route("/classes/delete/<int:id>", methods=("POST",))
+@login_required
 def delete_class(id):
+    uid = session["user_id"]
     conn = get_db_connection()
-    conn.execute("DELETE FROM classes WHERE id = ?", (id,))
+    conn.execute("DELETE FROM classes WHERE id = ? AND user_id = ?", (id, uid))
     conn.commit()
     conn.close()
     flash("Class deleted.")
     return redirect(url_for("classes"))
 
 
+# ── Payments ──────────────────────────────────────────────────────────────────
+
 @app.route("/payments")
+@login_required
 def payments():
+    uid = session["user_id"]
     conn = get_db_connection()
-    payments = conn.execute("SELECT * FROM payments ORDER BY id DESC").fetchall()
+    rows = conn.execute(
+        "SELECT * FROM payments WHERE user_id = ? ORDER BY id DESC", (uid,)
+    ).fetchall()
     conn.close()
-    return render_template("payments.html", payments=payments)
+    return render_template("payments.html", payments=rows)
 
 
 @app.route("/payments/add", methods=("GET", "POST"))
+@login_required
 def add_payment():
+    uid = session["user_id"]
     if request.method == "POST":
         member_name = request.form["member_name"].strip()
         amount = request.form["amount"].strip()
@@ -370,8 +479,8 @@ def add_payment():
 
         conn = get_db_connection()
         conn.execute(
-            "INSERT INTO payments (member_name, amount, payment_date, notes) VALUES (?, ?, ?, ?)",
-            (member_name, amount, payment_date, notes),
+            "INSERT INTO payments (user_id, member_name, amount, payment_date, notes) VALUES (?, ?, ?, ?, ?)",
+            (uid, member_name, amount, payment_date, notes),
         )
         conn.commit()
         conn.close()

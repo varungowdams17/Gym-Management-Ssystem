@@ -12,6 +12,6 @@
       <a href="{{ url_for('index') }}"><button type="button">Cancel</button></a>
     </div>
   </form>
-  <p style="margin-top:12px;color:rgba(255,255,255,0.8)">No account? Ask an admin to add you, or use registration if enabled.</p>
+  <p style="margin-top:12px;color:rgba(255,255,255,0.8)">No account? <a href="{{ url_for('register') }}" style="color:#3aa5ff;">Create one here.</a></p>
 </div>
 {% endblock %}
